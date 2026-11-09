@@ -28,9 +28,9 @@ import cv2
 import numpy as np
 from scipy.ndimage import distance_transform_edt
 from scipy.optimize import minimize
+from splatlib import angle_between, plane_frame, predict, sun_vec
 
 sys.path.insert(0, str(Path(__file__).parent))
-from fit_sun import angle_between, plane_frame, predict, sun_vec
 
 
 def main():

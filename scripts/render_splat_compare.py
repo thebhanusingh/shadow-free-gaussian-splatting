@@ -7,8 +7,8 @@ import numpy as np, torch
 from PIL import Image, ImageDraw
 from plyfile import PlyData
 from gsplat import rasterization
+from splatlib import read_cameras_bin, read_images_bin
 sys.path.insert(0, str(Path(__file__).parent))
-from fix_splat_shadows import read_cameras_bin, read_images_bin
 
 def load_ply(p):
     v = PlyData.read(str(p))["vertex"]; names = v.data.dtype.names

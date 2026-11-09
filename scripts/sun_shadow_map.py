@@ -26,13 +26,10 @@ from pathlib import Path
 import numpy as np
 import torch
 from PIL import Image
+from splatlib import SH_C0, look_at, read_ply, write_ply
 
 sys.path.insert(0, str(Path(__file__).parent))
-from fix_splat_shadows import read_ply, write_ply
-from render_orbit import look_at
 from train_2dgs_ref import render
-
-SH_C0 = 0.28209479177387814
 
 
 def main():

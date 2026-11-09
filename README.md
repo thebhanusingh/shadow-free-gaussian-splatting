@@ -48,6 +48,8 @@ scripts/setup_env.sh            one-time environment setup (+ nerfstudio patches
 scripts/make_splat.sh           video -> trained, exported Gaussian Splat (8 GB defaults, env overrides)
 scripts/make_splat_hq.sh        high-quality pipeline (sharpest frames, largest COLMAP model, full res)
 scripts/select_sharp_frames.py  sharpest frame per window of a video
+scripts/splatlib/               shared helpers: PLY and COLMAP readers, sRGB/linear colour, sun and shadow geometry
+tests/test_splatlib.py          tests for the shared helpers and the shadow geometry (no GPU, no data)
 scripts/fix_colmap_model.py     rebuild transforms.json from the largest COLMAP sub-model, in COLMAP coordinates
 scripts/watch_*.sh              progress/crash watchers for long runs
 scripts/runs/                   exact one-off run scripts behind each result in docs/lab-notes.md
@@ -106,3 +108,13 @@ expects, then runs its `train.py`. Output lands in `outputs_relightable/my_scene
 - **It relights only reflections.** Its base colour isn't lit by the environment map, so sun, shade and cast shadows
   stay baked in. On an outdoor grass scene a new HDR produced haze and purple streaks. It suits shiny objects, not
   outdoor delighting. See `docs/session-report.md` for alternatives (DiffusionRenderer, intrinsic 3DGS, GaRe).
+
+### Tests
+
+Run from the repo root, in the `gsplat` environment (uses only the standard `unittest`, nothing to install):
+
+```bash
+python -m unittest tests.test_splatlib -v
+```
+
+It checks colour maths, PLY and COLMAP round trips, camera projection, the sun and shadow geometry on a synthetic ball on a plane with a known sun, and that no script keeps its own copy of a shared helper. Run it before and after any change to `scripts/splatlib`.

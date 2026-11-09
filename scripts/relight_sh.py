@@ -39,11 +39,11 @@ from pathlib import Path
 
 import numpy as np
 from scipy.spatial import cKDTree
+from splatlib import LUM, SH_C0, chroma, read_ply, srgb_to_linear, write_ply
 
 sys.path.insert(0, str(Path(__file__).parent))
-from fill_geometry import LUM, SH_C0, chroma, colours, points
-from fill_shadows import linear_to_srgb, srgb_to_linear
-from fix_splat_shadows import read_ply, write_ply
+from fill_geometry import colours, points
+from fill_shadows import linear_to_srgb
 
 A_L = np.array([np.pi] + [2 * np.pi / 3] * 3 + [np.pi / 4] * 5)  # cosine-lobe factors per SH band
 

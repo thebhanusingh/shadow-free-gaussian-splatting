@@ -22,10 +22,9 @@ from pathlib import Path
 import cv2
 import numpy as np
 from scipy.ndimage import distance_transform_edt
+from splatlib import project, qvec2rotmat, read_cameras_bin, read_images_bin, read_ply
 
 sys.path.insert(0, str(Path(__file__).parent))
-from cluster_surfaces import read_ply
-from fix_splat_shadows import project, qvec2rotmat, read_cameras_bin, read_images_bin
 
 ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
 ap.add_argument("--labels", type=Path, required=True)

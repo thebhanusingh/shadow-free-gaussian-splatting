@@ -18,9 +18,9 @@ import numpy as np
 import torch
 from gsplat import rasterization
 from PIL import Image, ImageDraw
+from splatlib import look_at, qvec2rotmat, read_cameras_bin, read_images_bin
 
 sys.path.insert(0, str(Path(__file__).parent))
-from fix_splat_shadows import qvec2rotmat, read_cameras_bin, read_images_bin
 
 
 def load_ply(p):  # as in render_splat_compare.py (a flat script, so not importable)
@@ -36,18 +36,6 @@ def load_ply(p):  # as in render_splat_compare.py (a flat script, so not importa
                 scales=torch.exp(t(g("scale_0", "scale_1", "scale_2"))),
                 opacities=torch.sigmoid(t(np.asarray(v["opacity"], np.float32))), colors=t(sh),
                 sh_degree=int(round(np.sqrt(sh.shape[1]))) - 1)
-
-
-def look_at(pos, target, up):
-    z = target - pos
-    z /= np.linalg.norm(z)
-    x = np.cross(-up, z)
-    x /= np.linalg.norm(x)
-    y = np.cross(z, x)
-    w2c = np.eye(4)
-    w2c[:3, :3] = np.stack([x, y, z])
-    w2c[:3, 3] = -w2c[:3, :3] @ pos
-    return w2c
 
 
 def main():

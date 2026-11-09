@@ -30,8 +30,7 @@ from pathlib import Path
 import numpy as np
 from scipy import ndimage
 from scipy.spatial import cKDTree
-
-from fix_splat_shadows import SH_C0, linear_to_srgb, read_ply, srgb_to_linear, write_ply
+from splatlib import SH_C0, linear_to_srgb, read_ply, srgb_to_linear, write_ply
 
 
 def save_map(path, cell_lum, shadow, hole, fill, group, crack, obj, cands, assign, xs, ys, px=4):

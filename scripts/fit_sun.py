@@ -44,42 +44,9 @@ from pathlib import Path
 
 import numpy as np
 from scipy.ndimage import maximum_filter
+from splatlib import angle_between, iou, plane_frame, predict, sun_vec
 
 sys.path.insert(0, str(Path(__file__).parent))
-
-
-def plane_frame(up):
-    up = up / np.linalg.norm(up)
-    e1 = np.cross(up, [1.0, 0, 0]) if abs(up[0]) < 0.9 else np.cross(up, [0, 1.0, 0])
-    e1 /= np.linalg.norm(e1)
-    return up, e1, np.cross(up, e1)
-
-
-def sun_vec(elev, azim, frame):
-    up, e1, e2 = frame
-    el, az = np.radians(elev), np.radians(azim)
-    return np.cos(el) * (np.cos(az) * e1 + np.sin(az) * e2) + np.sin(el) * up
-
-
-def predict(occ, rec, s, cell, dilate, eps):
-    """Boolean shadow prediction for receivers rec (N,3) given occluders occ (M,3) and sun direction s."""
-    a = np.cross(s, [1.0, 0, 0]) if abs(s[0]) < 0.9 else np.cross(s, [0, 1.0, 0])
-    a /= np.linalg.norm(a)
-    b = np.cross(s, a)
-    po, pr = np.c_[occ @ a, occ @ b], np.c_[rec @ a, rec @ b]
-    lo = np.minimum(po.min(0), pr.min(0)) - cell * (dilate + 1)
-    io, ir = ((po - lo) / cell).astype(int), ((pr - lo) / cell).astype(int)
-    shape = np.maximum(io.max(0), ir.max(0)) + dilate + 2
-    depth = np.full(shape, -np.inf)
-    np.maximum.at(depth, (io[:, 0], io[:, 1]), occ @ s)
-    if dilate:
-        depth = maximum_filter(depth, size=2 * dilate + 1, mode="constant", cval=-np.inf)
-    return depth[ir[:, 0], ir[:, 1]] > rec @ s + eps
-
-
-def iou(pred, obs):
-    u = (pred | obs).sum()
-    return float((pred & obs).sum() / u) if u else 0.0
 
 
 def make_score(occ, rec, obs, args, chair=None, sel=None, sel_c=None):
@@ -127,10 +94,6 @@ def search(score, frame, args):
     fine = grid(el + np.arange(-1.5, 1.51, 0.25), az + np.arange(-1.5, 1.51, 0.25))
     best = max(fine, key=lambda r: r[2])
     return best, mid + fine, cmap
-
-
-def angle_between(u, v):
-    return float(np.degrees(np.arccos(np.clip(u @ v, -1, 1))))
 
 
 def collect_votes(xyz, opacity, rec_idx, args):

@@ -26,11 +26,11 @@ from pathlib import Path
 
 import numpy as np
 from scipy.spatial import cKDTree
+from splatlib import LUM, SH_C0, chroma, read_ply, write_ply
 
 sys.path.insert(0, str(Path(__file__).parent))
-from fill_geometry import LUM, SH_C0, chroma, colours
+from fill_geometry import colours
 from fill_shadows import linear_to_srgb
-from fix_splat_shadows import read_ply, write_ply
 
 
 def main():

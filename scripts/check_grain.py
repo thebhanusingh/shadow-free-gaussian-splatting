@@ -32,10 +32,9 @@ from pathlib import Path
 
 import cv2
 import numpy as np
+from splatlib import qvec2rotmat, read_cameras_bin, read_images_bin, read_ply
 
 sys.path.insert(0, str(Path(__file__).parent))
-from cluster_surfaces import read_ply
-from fix_splat_shadows import qvec2rotmat, read_cameras_bin, read_images_bin
 
 
 def intrinsics(cam):

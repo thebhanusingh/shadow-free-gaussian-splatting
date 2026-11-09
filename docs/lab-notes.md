@@ -1787,3 +1787,10 @@ video metadata. Reported on its own (no comparisons with other scenes yet). Grou
 
 ## 2026-11-09: whole-process review
 - User asked for a review of the whole process, the code and the industry. Written up as a doc: https://claude.ai/artifact/WEh1B5Auk2ENrWn5MS6bgH. Main points: detection and ground removal work; bear fills fail because colour is repaired inside the splat; field is moving to image-first delighting; biggest gap is no reference capture (overcast) to score against; code needs a shared module, settings file, tests, one scoring script, updated runner. No runs made.
+
+## 2026-11-09: shared library and tests
+- Committed the R3DG scripts and notes (dcd7ef7).
+- Added scripts/splatlib (ply.py, colmap.py, colour.py, geometry.py). Removed the copies of read_ply, write_ply, srgb_to_linear, linear_to_srgb, COLMAP readers, qvec2rotmat, project, look_at, plane_frame, sun_vec, predict, iou, angle_between, chroma, SH_C0 and LUM from 25 scripts (net -194 lines). fill_shadows keeps a one-line linear_to_srgb that clips to 0..1; the library version clips only when asked (clip=True), so every script keeps its old behaviour.
+- Checked old vs new on the bear data: PLY of 719,172 blobs byte-identical, images.bin and cameras.bin equal, projection, colour (both clip variants), quaternion, shadow prediction and look-at equal. All scripts still start with --help except 8 that fail for reasons unrelated to this (missing sddnet/pycolmap environment, scripts that need an argument).
+- Added tests/test_splatlib.py: 23 tests, 0.1 s, standard unittest. Covers colour, PLY and COLMAP files, projection, sun vector, a ball on a plane with a known sun (shadow disc inside/outside check, shadow moves with azimuth), IoU, and a guard that no script redefines a library function.
+- Not done yet: settings file per scene, one scoring script, new runner (run_full_6705.sh still runs the old path), environment lock files.

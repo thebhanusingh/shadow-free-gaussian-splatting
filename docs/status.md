@@ -98,6 +98,11 @@ Last updated 2026-11-04. Short hand-off so a new session can pick up without the
 - Deep research: `reports/Deshadow models for splats.md` in the Windows checkout (notes in `research_notes/`), not on the laptop WSL repo. Ranked: control = user adjacent method per photo inside the geometry mask with per-blob median across views; SGCR-SR gain; Colorful Diffuse gain; mask-fed models; DiffusionRenderer Cosmos / UniRelight on the school machine.
 - Next (proposed, not started): per-photo correction before training a normal 3DGS (user idea: work out the light first). Note WSL can restart when idle: tmux, ttyd and tunnel then need restarting.
 
+## Code and tests (2026-11-09)
+- New `scripts/splatlib/` (ply, colmap, colour, geometry) replaces copies of the same helpers in 25 scripts; old and new output checked identical on the bear data (PLY read, COLMAP read, projection, colour, shadow prediction, look-at).
+- New `tests/test_splatlib.py`, 23 tests, about 0.1 s: `python -m unittest tests.test_splatlib -v`. Includes a synthetic ball-on-plane shadow check and a guard that no script redefines a library function.
+- Review doc: https://claude.ai/artifact/WEh1B5Auk2ENrWn5MS6bgH (method, code and capture improvements). Next code items from it: settings file per scene, one scoring script, new end-to-end runner around the working path.
+
 ## Pending decisions / reminders
 - Commit the new uncommitted scripts? (`sun_from_metadata.py`, `find_object.py`, `sample_load.py`,
   `runs/run_full_6705.sh`, `fit_sun_edges.py --fix-elevation`; plus older uncommitted bear 1 scripts). Ask first.

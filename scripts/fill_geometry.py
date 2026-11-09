@@ -35,13 +35,10 @@ from pathlib import Path
 
 import numpy as np
 from scipy.spatial import cKDTree
+from splatlib import LUM, SH_C0, chroma, read_ply, srgb_to_linear, write_ply
 
 sys.path.insert(0, str(Path(__file__).parent))
-from fill_shadows import linear_to_srgb, srgb_to_linear
-from fix_splat_shadows import read_ply, write_ply
-
-SH_C0 = 0.28209479177387814
-LUM = np.array([0.2126, 0.7152, 0.0722])
+from fill_shadows import linear_to_srgb
 
 
 def colours(data):
@@ -49,10 +46,6 @@ def colours(data):
                                                      key=lambda s: int(s.split("_")[-1]))
     SH = np.stack([data[n] for n in names], 1).astype(np.float64)
     return names, SH, srgb_to_linear(np.clip(SH[:, :3] * SH_C0 + 0.5, 0, 1))
-
-
-def chroma(rgb):
-    return rgb / np.maximum(rgb.sum(1, keepdims=True), 1e-6)
 
 
 def points(path, header, sub, rgb_lin):

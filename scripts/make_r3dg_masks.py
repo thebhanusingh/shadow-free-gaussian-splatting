@@ -17,9 +17,9 @@ import torch
 from gsplat import rasterization
 from PIL import Image
 from scipy import ndimage
+from splatlib import qvec2rotmat, read_cameras_bin, read_images_bin, read_ply
 
 sys.path.insert(0, str(Path(__file__).parent))
-from fix_splat_shadows import qvec2rotmat, read_cameras_bin, read_images_bin, read_ply
 
 
 def main():

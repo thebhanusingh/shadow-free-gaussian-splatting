@@ -20,9 +20,9 @@ from pathlib import Path
 
 import numpy as np
 from scipy import ndimage
+from splatlib import qvec2rotmat, read_images_bin, read_ply
 
 sys.path.insert(0, str(Path(__file__).parent))
-from fix_splat_shadows import qvec2rotmat, read_images_bin, read_ply
 
 
 def main():

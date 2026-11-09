@@ -25,18 +25,15 @@ from pathlib import Path
 
 import numpy as np
 from scipy.spatial import cKDTree
+from splatlib import SH_C0, read_ply, srgb_to_linear, write_ply
+from splatlib import linear_to_srgb as _linear_to_srgb
 
 sys.path.insert(0, str(Path(__file__).parent))
-from cluster_surfaces import SH_C0, read_ply, write_ply
-
-
-def srgb_to_linear(c):
-    return np.where(c <= 0.04045, c / 12.92, ((c + 0.055) / 1.055) ** 2.4)
 
 
 def linear_to_srgb(c):
-    c = np.clip(c, 0, 1)
-    return np.where(c <= 0.0031308, c * 12.92, 1.055 * c ** (1 / 2.4) - 0.055)
+    """Library version, clamped to 0..1 (these scripts write finished colours)."""
+    return _linear_to_srgb(c, clip=True)
 
 
 def main():

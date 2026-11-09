@@ -26,13 +26,9 @@ from pathlib import Path
 
 import numpy as np
 from scipy.spatial import cKDTree
+from splatlib import SH_C0, read_ply, srgb_to_linear, write_ply
 
 sys.path.insert(0, str(Path(__file__).parent))
-from cluster_surfaces import SH_C0, read_ply, write_ply
-
-
-def srgb_to_linear(c):
-    return np.where(c <= 0.04045, c / 12.92, ((c + 0.055) / 1.055) ** 2.4)
 
 
 def prf(pred, obs):

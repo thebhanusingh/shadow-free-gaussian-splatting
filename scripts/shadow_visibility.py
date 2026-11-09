@@ -33,11 +33,9 @@ from pathlib import Path
 
 import numpy as np
 from scipy.spatial import cKDTree
+from splatlib import SH_C0, plane_frame, predict, project, qvec2rotmat, read_cameras_bin, read_images_bin, read_ply, sun_vec, write_ply
 
 sys.path.insert(0, str(Path(__file__).parent))
-from cluster_surfaces import SH_C0, read_ply, write_ply
-from fit_sun import plane_frame, predict, sun_vec
-from fix_splat_shadows import project, qvec2rotmat, read_cameras_bin, read_images_bin
 
 
 def prf(pred, obs):

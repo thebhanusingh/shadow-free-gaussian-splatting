@@ -27,14 +27,10 @@ import time
 from pathlib import Path
 
 import numpy as np
+from splatlib import angle_between, iou, plane_frame, predict, sun_vec
 
 sys.path.insert(0, str(Path(__file__).parent))
-from fit_sun import angle_between, collect_votes, plane_frame, predict, sun_vec
-
-
-def iou(p, o):
-    u = (p | o).sum()
-    return float((p & o).sum() / u) if u else 0.0
+from fit_sun import collect_votes
 
 
 def main():

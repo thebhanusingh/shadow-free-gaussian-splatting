@@ -23,9 +23,9 @@ from pathlib import Path
 
 import numpy as np
 from scipy.spatial import cKDTree
+from splatlib import qvec2rotmat, read_ply
 
 sys.path.insert(0, str(Path(__file__).parent))
-from fix_splat_shadows import qvec2rotmat, read_ply
 
 
 def angle(a, b):

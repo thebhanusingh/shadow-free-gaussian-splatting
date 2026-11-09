@@ -35,8 +35,8 @@ from pytorch_msssim import SSIM, ssim
 from scipy.spatial import cKDTree
 from torchmetrics.image import PeakSignalNoiseRatio
 from torchmetrics.image.lpip import LearnedPerceptualImagePatchSimilarity
-
-C0 = 0.28209479177387814  # SH band-0 constant
+from splatlib import SH_C0
+C0 = SH_C0
 
 
 def viewmat(c2w34):

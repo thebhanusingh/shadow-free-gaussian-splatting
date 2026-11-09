@@ -24,10 +24,9 @@ import numpy as np
 import torch
 from PIL import Image, ImageDraw
 from scipy.spatial import cKDTree
+from splatlib import look_at, qvec2rotmat, read_cameras_bin, read_images_bin, read_ply
 
 sys.path.insert(0, str(Path(__file__).parent))
-from fix_splat_shadows import qvec2rotmat, read_cameras_bin, read_images_bin, read_ply
-from render_orbit import look_at
 from train_2dgs_ref import render
 
 

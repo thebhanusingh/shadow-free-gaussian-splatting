@@ -67,3 +67,8 @@ Steps 1-3 are skipped if `data/<scene>/transforms_nsprocess.json` exists.
 | `IMG_6557` (school) | IMG_6557.mov on the RTX PRO 6000 Blackwell 96 GB | 2026-09-29: splatfacto-big 60k, uncapped, 672 frames, exhaustive matching, 4.15M Gaussians, 982 MB, 13.6 GB peak VRAM, 1 h 46 min. Copy at `/mnt/c/Users/roach/Downloads/splat.ply`. Comparison vs the laptop in `exports/school_vs_laptop/` (offset-corrected held-out PSNR 25.19 vs 24.75, visibly crisper). |
 | `IMG_6557` | IMG_6557.MOV | Done 2026-09-29 10:58. splatfacto-big crashed at step 7390 ("CUDA driver error: device not ready"), and the automatic fallback to splatfacto finished 30k: `exports/IMG_6557/splat.ply` (1.45M Gaussians, 359 MB), config `outputs/IMG_6557/splatfacto/2026-09-29_100714/`. |
 | `IMG_6615_hloc` | IMG_6615.MOV (indoor, low texture) | Done 2026-10-08 23:03. hloc SfM (SuperPoint+LightGlue, 981/1000 posed; COLMAP managed 72%), splatfacto-big 30k, stop-split 12000, antialiased, scale reg. 1.30M Gaussians, 323 MB, 50 min, 3.5 GB VRAM, 15.2 GB RAM. `exports/IMG_6615_hloc/splat.ply`. |
+
+## Code rules (since 2026-11-09)
+- Shared helpers (PLY and COLMAP readers, sRGB/linear colour, sun and shadow geometry) live in `scripts/splatlib`. Import them; never copy a helper into a script. `tests/test_splatlib.py` fails if a script redefines one.
+- Run `python -m unittest tests.test_splatlib` (env `gsplat`, about 1 s) before committing any change to the scripts or the library.
+- Do the colour gain maths in linear light (`srgb_to_linear`), convert back with `linear_to_srgb` only when writing.

@@ -30,10 +30,9 @@ from ppisp import PPISP
 from pytorch_msssim import SSIM, ssim
 from torchmetrics.image import PeakSignalNoiseRatio
 from torchmetrics.image.lpip import LearnedPerceptualImagePatchSimilarity
+from splatlib import read_ply, srgb_to_linear, write_ply
 
 sys.path.insert(0, str(Path(__file__).parent))
-from fill_shadows import srgb_to_linear
-from fix_splat_shadows import read_ply, write_ply
 from train_2dgs_ref import C0, intrinsics, refined_c2w, viewmat
 
 
