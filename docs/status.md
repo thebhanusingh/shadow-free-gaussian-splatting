@@ -1,6 +1,6 @@
 # Current status (read after CLAUDE.md; details in docs/lab-notes.md)
 
-Last updated 2026-11-02. Short hand-off so a new session can pick up without the old conversation.
+Last updated 2026-11-04. Short hand-off so a new session can pick up without the old conversation.
 
 ## Where things stand
 - **Bear 2 (IMG_6705, seated cowboy-hat bear, 16 cm, concrete)** ran end to end with ONE command on 2026-10-27:
@@ -75,6 +75,28 @@ Last updated 2026-11-02. Short hand-off so a new session can pick up without the
   methods cannot recover it.
 - Next (user, 2026-11-02): BRDF decomposition with R3DG using OUR sun direction, to get paint colours and remove
   shadows. Not started.
+
+## R3DG test (2026-11-02/03): ran, shadows went into the paint
+- Env `r3dg` (Python 3.9, PyTorch 2.0.1 cu118, conda CUDA 11.8 nvcc + cudart, conda gcc 11; conda-forge CUDA 13.x
+  packages removed), code `~/third_party/Relightable3DGaussian` (commit a102f14; Inria GS licence, non-commercial).
+  Local changes there (originals `*.orig`): mask fix + mask broadcast in `scene/dataset_readers.py`, float32 images
+  in `scene/utils.py`, sun patch (`scripts/patch_r3dg_sun.py`: fixed-direction sun, learnable strength, ray-traced
+  visibility, saved with the light checkpoint), `eval_sun.py` (= `scripts/r3dg_eval_sun.py`).
+- Data `data/IMG_6705_r3dg_half` (960 x 538 undistorted, masks of bear + ground within 2 x height; full size runs out
+  of RAM). Stage 1 (`outputs_r3dg/IMG_6705/3dgs`, 42 min, 636k Gaussians, PSNR 27.4 masked). Stage 2
+  (`scripts/runs/r3dg_stage2.sh 40000 8`, `outputs_r3dg/IMG_6705/neilf_sun`, about 1 h; 32 samples spilled the 8 GB card).
+- Result: paint x light PSNR 23.8; learned sun strength stayed at its start (3.0); the ground shadow and bear shading
+  are baked into the base colour, so unblocking sun / sky changes only the edges. Summary image
+  `outputs_r3dg/IMG_6705/neilf_sun/sun_eval_40000/r3dg_summary.jpg`.
+- Offered next (user paused, "lets do stuff tomorrow"): retry stage 2 with the sun strength FIXED from the concrete
+  measurement and the per-Gaussian local light heavily penalised, so only the traced visibility can darken shadows.
+- Uncommitted: scripts/make_r3dg_masks.py, patch_r3dg_sun.py, r3dg_eval_sun.py, runs/setup_r3dg_env.sh,
+  runs/build_r3dg_ext.sh, runs/prep_r3dg_data.sh, runs/prep_r3dg_half.sh, runs/r3dg_stage2.sh, notes, status (ask).
+
+## R3DG retry and research (2026-11-04): R3DG dropped, photo correction next
+- Retry (`scripts/runs/r3dg_stage2_fix.sh 40000 8`, `outputs_r3dg/IMG_6705/neilf_sun_fix`): sun fixed 3.8/3.5/3.0, no local light, shade-guided paint smoothness. Held-out paint x light PSNR 23.5. Failed the same way: ground paint 0.03 in photo shadow vs 0.27 lit, though traced visibility is right (96.6% / 0.4%); bear paint oversaturated orange with glassy shards. Conclusion: one lighting condition does not constrain R3DG enough.
+- Deep research: `reports/Deshadow models for splats.md` in the Windows checkout (notes in `research_notes/`), not on the laptop WSL repo. Ranked: control = user adjacent method per photo inside the geometry mask with per-blob median across views; SGCR-SR gain; Colorful Diffuse gain; mask-fed models; DiffusionRenderer Cosmos / UniRelight on the school machine.
+- Next (proposed, not started): per-photo correction before training a normal 3DGS (user idea: work out the light first). Note WSL can restart when idle: tmux, ttyd and tunnel then need restarting.
 
 ## Pending decisions / reminders
 - Commit the new uncommitted scripts? (`sun_from_metadata.py`, `find_object.py`, `sample_load.py`,
