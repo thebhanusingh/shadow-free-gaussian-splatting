@@ -20,6 +20,6 @@ A 3D Gaussian splat trained from photos taken under one sun stores the cast shad
   title  = {Shadow-Free Gaussian Splatting: Sun Estimation from Cast-Shadow Geometry and Surface-Aware Inpainting of 3D Gaussian Splats},
   year   = {2026},
   note   = {Preprint},
-  url    = {https://github.com/thebhanusingh/Claude_Test}
+  url    = {https://github.com/thebhanusingh/shadow-free-gaussian-splatting}
 }
 ```
