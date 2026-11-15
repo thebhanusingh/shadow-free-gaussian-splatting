@@ -33,7 +33,7 @@ Skip to step 2 if this machine already has the environment from a previous
 run.
 
 ```bash
-git clone https://github.com/thebhanusingh/Claude_Test
+git clone https://github.com/thebhanusingh/shadow-free-gaussian-splatting Claude_Test
 cd Claude_Test
 ```
 
