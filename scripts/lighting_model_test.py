@@ -61,7 +61,7 @@ def fit_channel(logL, g, B, sun, G, lam, const_sky=False):
     return lr, A
 
 
-def predict(lr, A, g, B, sun):
+def predict_brightness(lr, A, g, B, sun):
     return np.exp(lr[g]) * np.maximum(B @ A + sun, 1e-3)
 
 
@@ -162,17 +162,17 @@ def main():
     for c in range(3):
         L = np.log(np.maximum(rgb[:, c], 1e-6))
         lr, A = fit_channel(L[fit], g[fit], B[fit], sun[fit], a.groups, a.lam)
-        pred[:, c] = predict(lr, A, g, B, sun * 0)           # sky only (for held-out cast-shadowed blobs)
-        full = predict(lr, A, g, B, sun)                      # with sun, for the fit set
+        pred[:, c] = predict_brightness(lr, A, g, B, sun * 0)           # sky only (for held-out cast-shadowed blobs)
+        full = predict_brightness(lr, A, g, B, sun)                    # with sun, for the fit set
         pred_fit = np.where(fit, full, 0)
         lrc, Ac = fit_channel(L[fit], g[fit], B[fit], sun[fit], a.groups, a.lam, const_sky=True)
-        pred_c[:, c] = predict(lrc, Ac, g, B, sun * 0)
+        pred_c[:, c] = predict_brightness(lrc, Ac, g, B, sun * 0)
         # shuffled directions inside each paint group (null)
         Bs = B.copy()
         for k in range(a.groups):
             m = np.flatnonzero(test & (g == k))
             Bs[m] = B[rng.permutation(m)] if len(m) else Bs[m]
-        pred_sh[:, c] = predict(lr, A, g, Bs, sun * 0)
+        pred_sh[:, c] = predict_brightness(lr, A, g, Bs, sun * 0)
         pred[fit, c] = pred_fit[fit]
         sky_up.append(float(basis(up[None], up)[0] @ A))
         out["channels"][["R", "G", "B"][c]] = dict(sky_at_up_over_sun=round(sky_up[-1], 3), sky_coeffs=[round(float(v), 3) for v in A],

@@ -8,7 +8,9 @@ BEAR (per pixel, linear light, per channel c; sun strength 1, n = 2DGS normals r
     result         rho * E_new, never darker than the photo, at most --lit-cap x the local mean of the lit pixels
 A lit pixel with cos >= floor has E_new = E_old, so it stays the photo; shadowed and turned-away pixels are lifted to the
 floor (cast shadows on sun-facing surfaces get at least their own cos back). Surfaces turned away from the sun get at most --attached-max (they keep their form shading). The lifted colour may not be more saturated than the sunlit paint of the same hue (--sat-cap: per-hue saturation percentile of the sunlit bear pixels, measured in the calibration). The gain is feathered over the bear's edge.
-GROUND: the shadow the bear throws on the concrete (the SDDNet photo mask on ground-plane pixels) is lifted by the concrete's
+GROUND: the shadow the bear throws on the concrete (the SDDNet photo mask on ground-plane pixels, only inside the area where
+the bear's own shadow can fall: bear blobs slid along the sun onto the plane, grown by --footprint-margin; other shadows in the
+scene are left alone) is lifted by the concrete's
 sun/shade ratio, measured from the photos themselves in the calibration, and takes the colour of the lit concrete around it.
 CALIBRATION (no hand values): on every --calib-every-th photo the script measures, across the old shadow edges, how the
 paint of the lit side compares with the paint of the shadow side. The colour strength t of the sky (k_c from the concrete
@@ -34,12 +36,9 @@ from photo_correct_edge import bands
 from PIL import Image
 from sky_visibility import add_arguments, build
 from scipy.spatial import cKDTree
-from splatlib import LUM, SH_C0, linear_to_srgb, qvec2rotmat, read_cameras_bin, read_images_bin, read_ply, srgb_to_linear
+from splatlib import (LUM, SH_C0, ground_footprint, in_footprint, linear_to_srgb, qvec2rotmat, read_cameras_bin, read_images_bin,
+                      read_ply, srgb_to_linear)
 from train_2dgs_ref import render, surfel_normals
-
-RATIO = np.array([8.5, 6.6, 4.2])                                # concrete sun / shade, linear light
-K_RGB = np.cos(np.radians(45)) / (RATIO - 1)
-K_LUM = float(np.cos(np.radians(45)) / (RATIO @ LUM - 1))
 
 
 def smoothstep(x, a, b):
@@ -78,20 +77,26 @@ class Scene:
         rgb0 = srgb_to_linear(np.clip(np.stack([gg0[f"f_dc_{i}"][self.bear_idx] for i in range(3)], 1) * SH_C0 + 0.5, 0, 1))
         pos0 = np.stack([gg0[k][self.bear_idx] for k in "xyz"], 1).astype(float)
         lit0 = lab["visible"] >= 0.5
-        chroma0 = rgb0 / np.maximum(rgb0.sum(1, keepdims=True), 1e-6)
-        tree = cKDTree(pos0[lit0 & (rgb0 @ LUM > 0.01)])
-        lit_chroma = chroma0[lit0 & (rgb0 @ LUM > 0.01)]
-        sh_ix = np.flatnonzero(~lit0)
-        dist, nb = tree.query(pos0[sh_ix], k=10, distance_upper_bound=a.chroma_radius * float(obj0["height"]))
-        tgt = np.zeros((len(self.bear_idx), 3), np.float32)
-        okb = np.isfinite(dist[:, 2])
-        for j in np.flatnonzero(okb):
-            tgt[sh_ix[j], :2] = np.median(lit_chroma[nb[j][np.isfinite(dist[j])]][:, :2], axis=0)
-            tgt[sh_ix[j], 2] = 1.0
-        arr2 = np.zeros((n, 3), np.float32)
-        arr2[self.bear_idx] = tgt
-        self.col_target = torch.from_numpy(arr2).cuda()
-        print(f"chroma targets for {int(okb.sum()):,} of {len(sh_ix):,} shadowed bear blobs")
+        # where the bear's own shadow can fall on the ground: the ground correction only touches photo-mask pixels inside it
+        # (other shadows in the scene, the photographer's, a wall's, are left alone)
+        self.footprint = ground_footprint(pos0, self.up, self.sun, self.plane_off,
+                                          cell=a.footprint_cell * self.height, margin=a.footprint_margin * self.height)
+        self.col_target = None
+        if a.chroma_beta > 0:                                        # only needed when the chroma step is switched on
+            chroma0 = rgb0 / np.maximum(rgb0.sum(1, keepdims=True), 1e-6)
+            tree = cKDTree(pos0[lit0 & (rgb0 @ LUM > 0.01)])
+            lit_chroma = chroma0[lit0 & (rgb0 @ LUM > 0.01)]
+            sh_ix = np.flatnonzero(~lit0)
+            dist, nb = tree.query(pos0[sh_ix], k=10, distance_upper_bound=a.chroma_radius * float(obj0["height"]))
+            tgt = np.zeros((len(self.bear_idx), 3), np.float32)
+            okb = np.isfinite(dist[:, 2])
+            for j in np.flatnonzero(okb):
+                tgt[sh_ix[j], :2] = np.median(lit_chroma[nb[j][np.isfinite(dist[j])]][:, :2], axis=0)
+                tgt[sh_ix[j], 2] = 1.0
+            arr2 = np.zeros((n, 3), np.float32)
+            arr2[self.bear_idx] = tgt
+            self.col_target = torch.from_numpy(arr2).cuda()
+            print(f"chroma targets for {int(okb.sum()):,} of {len(sh_ix):,} shadowed bear blobs")
         a.out.mkdir(parents=True, exist_ok=True)
         surf = {k: v.cuda() for k, v in torch.load(a.surfels).items()}
         self.surf, self.s_n = surf, surfel_normals(surf["quats"])
@@ -105,9 +110,13 @@ class Scene:
             return np.where(r[..., 1] > 0.5, r[..., 0] / np.maximum(r[..., 1], 1e-6), 0.0).astype(np.float32), r[..., 1] > 0.5
 
         mb, bear = flag(self.col_bear)
-        rt = to_photo_space(render_labels(self.sp, self.col_target, im, cam), cam)
-        ct_ok = rt[..., 2] > 0.3
-        ct = np.where(ct_ok[..., None], rt[..., :2] / np.maximum(rt[..., 2:3], 1e-6), 0.0).astype(np.float32)
+        if self.col_target is not None:
+            rt = to_photo_space(render_labels(self.sp, self.col_target, im, cam), cam)
+            ct_ok = rt[..., 2] > 0.3
+            ct = np.where(ct_ok[..., None], rt[..., :2] / np.maximum(rt[..., 2:3], 1e-6), 0.0).astype(np.float32)
+        else:
+            ct_ok = np.zeros(mb.shape, bool)
+            ct = np.zeros(mb.shape + (2,), np.float32)
         ncol, alpha = render_normals(self.surf, self.s_n, im, cam)
         ncol, alpha = to_photo_space(ncol, cam), to_photo_space(alpha, cam)
         if a.smooth > 0:
@@ -123,9 +132,10 @@ class Scene:
             mb = np.where(hole, nblur(mb, use0.astype(np.float32), 5.0)[0], mb)
             cos = np.where(hole, nblur(cos, use0.astype(np.float32), 5.0)[0], cos)
         mask = np.asarray(Image.open(a.masks / (name + ".png"))) > 127
-        gpx = ground_pixels(self, im, cam, a.ground_radius)
+        gpx, own = ground_pixels(self, im, cam, a.ground_radius)
         bear_d = cv2.dilate(use.astype(np.uint8), np.ones((5, 5), np.uint8)).astype(bool)
-        ground = mask & gpx & ~bear_d
+        ground = mask & gpx & own & ~bear_d                          # photo shadow, on the ground, inside the bear's own shadow
+        ground_other = mask & gpx & ~own & ~bear_d                   # photo shadow on the ground that is NOT the bear's: left alone
         ground = cv2.erode(ground.astype(np.uint8), np.ones((a.ground_erode, a.ground_erode), np.uint8)).astype(bool) if a.ground_erode > 1 else ground
         mg = np.clip(cv2.GaussianBlur(ground.astype(np.float32), (0, 0), a.ground_soft), 0, 1)
         lit_g = gpx & ~cv2.dilate((mask & gpx).astype(np.uint8), np.ones((21, 21), np.uint8)).astype(bool) & ~bear_d
@@ -133,11 +143,12 @@ class Scene:
         inner = cv2.erode(ground.astype(np.uint8), np.ones((21, 21), np.uint8)).astype(bool)
         gdist = cv2.distanceTransform(ground.astype(np.uint8), cv2.DIST_L2, 3)       # px from the shadow's edge, inside it
         return dict(gdist=gdist, name=name, im=im, orig8=orig8, P=srgb_to_linear(orig8.astype(np.float32) / 255), mb=mb, bear=bear,
-                    mg=mg, ground=mg > 0.02, lit_ground=lit_g, cos=cos, use=use, ring=ring, inner=inner, ct=ct, ct_ok=ct_ok)
+                    mg=mg, ground=mg > 0.02, ground_other=ground_other, lit_ground=lit_g, cos=cos, use=use, ring=ring, inner=inner, ct=ct, ct_ok=ct_ok)
 
 
 def ground_pixels(scene, im, cam, radius):
-    """Photo pixels whose surfel surface lies on the ground plane within `radius` x object height of the bear's footprint."""
+    """Two photo-pixel masks: (1) pixels whose surfel surface lies on the ground plane within `radius` x object height of the
+    bear's footprint; (2) of those, the pixels inside the area where the bear's own shadow can fall (scene.footprint)."""
     W, H = int(cam["width"]), int(cam["height"])
     fx, fy, cx, cy = cam["params"][:4]
     w2c = np.eye(4)
@@ -154,7 +165,8 @@ def ground_pixels(scene, im, cam, radius):
     h = Xw @ scene.up + scene.plane_off
     r = np.linalg.norm(Xw - scene.foot, axis=2)
     ok = ((alpha > 0.5) & (np.abs(h) < 4 * scene.plane_tol) & (r < radius * scene.height) & (depth > 0)).astype(np.float32)
-    return to_photo_space(ok, cam) > 0.5
+    own = ok * in_footprint(scene.footprint, Xw).astype(np.float32)
+    return to_photo_space(ok, cam) > 0.5, to_photo_space(own, cam) > 0.5
 
 
 HUE_BINS = 24
@@ -186,7 +198,7 @@ def saturation_caps(frames, pct):
     return caps
 
 
-def k_of(t, ratio=RATIO, cos_up=float(np.cos(np.radians(45)))):
+def k_of(t, ratio, cos_up):
     """Sky light over sun light for an open upward surface, from the concrete's sun/shade ratio and the sun's height:
     ratio = 1 + cos_up / k.  t = 0 luminance only .. 1 full colour."""
     ratio = np.asarray(ratio, float)
@@ -250,9 +262,11 @@ def calibrate(scene, names, a):
     ratio, nr = measure_ground_ratio(frames)
     cos_up = float(scene.sun @ scene.up)
     print(f"  sun {np.degrees(np.arcsin(cos_up)):.1f} deg above the ground; concrete sun/shade ratio from {nr} photos: "
-          f"{None if ratio is None else ratio.round(2)} (the PPISP measure on bear 2 was {RATIO})")
+          f"{None if ratio is None else ratio.round(2)}")
     if ratio is None:
-        ratio = RATIO
+        # no silent fallback to another scene's value: a wrong ratio lifts the ground the wrong amount everywhere
+        raise SystemExit("could not measure the concrete sun/shade ratio (fewer than 3 photos with a usable shadow ring); "
+                         "raise --calib-every's density (smaller number) or check the shadow masks")
     best_t, rows = None, {}
     for t in (0.0, 0.25, 0.5, 0.75, 1.0):
         k = k_of(t, ratio, cos_up)
@@ -287,8 +301,8 @@ def calibrate(scene, names, a):
 
 def correct(f, cal, a):
     P, use, m, cos = f["P"], f["use"], f["mb"], f["cos"]
-    ratio = np.array(cal.get("ratio", RATIO), float)
-    k = k_of(cal["t"], ratio, cal.get("cos_up", float(np.cos(np.radians(45)))))
+    ratio = np.array(cal["ratio"], float)                           # both come from this scene's own calibration
+    k = k_of(cal["t"], ratio, cal["cos_up"])
     rho, _ = paint_and_light(f, k, cal["scale_attached"], cal["scale_cast"])
     E_new = k[None, None, :] + np.maximum(cos, a.floor)[..., None]
     gain = np.maximum(rho * E_new / np.maximum(P, 1e-6), 1.0)
@@ -377,7 +391,9 @@ def main():
     ap.add_argument("--attached-max", type=float, default=2.5, help="largest gain on pixels turned away from the sun")
     ap.add_argument("--smooth", type=float, default=2.0)
     ap.add_argument("--feather", type=float, default=2.5)
-    ap.add_argument("--masks", type=Path, default=Path("data/IMG_6705/shadow_masks"), help="SDDNet photo shadow masks (ground)")
+    ap.add_argument("--masks", type=Path, required=True, help="SDDNet photo shadow masks (ground) of THIS scene")
+    ap.add_argument("--footprint-cell", type=float, default=0.01, help="x object height, grid cell of the bear's own shadow area")
+    ap.add_argument("--footprint-margin", type=float, default=0.05, help="x object height, how far the shadow area is grown")
     ap.add_argument("--ground-soft", type=float, default=2.0, help="px, softening of the ground shadow edge")
     ap.add_argument("--ground-cap", type=float, default=1.5, help="ground gain keeps the pixel at most this x the local lit concrete")
     ap.add_argument("--ground-radius", type=float, default=6.0, help="ground pixels within this x object height of the bear")

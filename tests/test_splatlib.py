@@ -17,9 +17,9 @@ import numpy as np
 ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT / "scripts"))
 
-from splatlib import (LUM, SH_C0, angle_between, chroma, iou, linear_to_srgb, look_at, plane_frame, ply_header,  # noqa: E402
-                      predict, project, qvec2rotmat, read_cameras_bin, read_images_bin, read_ply, srgb_to_linear,
-                      sun_vec, write_ply)
+from splatlib import (LUM, SH_C0, angle_between, chroma, ground_footprint, in_footprint, iou, linear_to_srgb,  # noqa: E402
+                      look_at, plane_frame, ply_header, predict, project, qvec2rotmat, read_cameras_bin,
+                      read_images_bin, read_ply, srgb_to_linear, sun_vec, write_ply)
 
 
 class Colour(unittest.TestCase):
@@ -194,6 +194,60 @@ class SunAndShadow(unittest.TestCase):
         self.assertEqual(iou(a, ~a), 0.0)
         self.assertAlmostEqual(iou(a, np.array([1, 0, 1, 0], bool)), 1 / 3)
         self.assertEqual(iou(~a & False, ~a & False), 0.0)             # both empty: defined as 0
+
+
+class GroundFootprint(unittest.TestCase):
+    """Where the bear's own shadow can fall on the ground: a ball above the plane, sun at 45 degrees."""
+
+    def setUp(self):
+        self.up = np.array([0.0, 0.0, 1.0])
+        self.frame = plane_frame(self.up)
+        self.centre = np.array([1.0, 2.0, 0.5])                       # ball centre, 0.5 above the plane z = 0
+        rng = np.random.default_rng(0)
+        d = rng.normal(size=(3000, 3))
+        d /= np.linalg.norm(d, axis=1, keepdims=True)
+        self.ball = self.centre + 0.2 * d
+
+    def test_shadow_lands_away_from_the_sun_and_other_places_are_outside(self):
+        for az in (0, 90, 200, 300):
+            s = sun_vec(45, az, self.frame)
+            fp = ground_footprint(self.ball, self.up, s, plane_off=0.0, cell=0.02, margin=0.05)
+            land = self.centre - (self.centre[2] / s[2]) * s            # centre of the shadow on z = 0
+            self.assertTrue(in_footprint(fp, land), f"azimuth {az}: shadow centre not in the footprint")
+            # 1.5 units sideways of the shadow is far from it and from the ball: outside
+            side = land + 1.5 * self.frame[1]
+            self.assertFalse(in_footprint(fp, side), f"azimuth {az}: a far point is inside")
+            # sun 45 degrees up, ball centre 0.5 above the ground: the shadow is shifted 0.5 along the ground
+            self.assertAlmostEqual(float(np.linalg.norm(land[:2] - self.centre[:2])), 0.5, places=6)
+
+    def test_points_outside_the_grid_are_false(self):
+        s = sun_vec(45, 0, self.frame)
+        fp = ground_footprint(self.ball, self.up, s, plane_off=0.0, cell=0.02, margin=0.05)
+        self.assertFalse(in_footprint(fp, np.array([1000.0, 1000.0, 0.0])))
+        self.assertEqual(in_footprint(fp, np.zeros((4, 5, 3)) + 500).shape, (4, 5))
+
+    def test_margin_grows_the_area(self):
+        s = sun_vec(45, 0, self.frame)
+        a = ground_footprint(self.ball, self.up, s, 0.0, cell=0.02, margin=0.02)["grid"].sum()
+        b = ground_footprint(self.ball, self.up, s, 0.0, cell=0.02, margin=0.2)["grid"].sum()
+        self.assertGreater(b, a)
+
+
+class CorrectPhotosGuards(unittest.TestCase):
+    """correct_photos.py is the main script and needs a GPU, so its rules are checked on the text: no value copied
+    from another scene may stay in it as a default."""
+
+    def setUp(self):
+        self.src = (ROOT / "scripts" / "correct_photos.py").read_text()
+
+    def test_no_other_scene_defaults(self):
+        self.assertNotIn("IMG_6705", self.src.split("def main")[1].split("a = ap.parse_args()")[0].replace("IMG_6705_fixed", ""),
+                         "an argument default points at one scene's data")
+        self.assertNotIn("8.5, 6.6, 4.2", self.src, "the concrete ratio of another scene is hard-coded")
+        self.assertIsNone(re.search(r"cal\.get\(\"(ratio|cos_up)\"", self.src), "calibration values must be required, not defaulted")
+
+    def test_masks_argument_is_required(self):
+        self.assertIsNotNone(re.search(r"--masks\", type=Path, required=True", self.src))
 
 
 class RepoDiscipline(unittest.TestCase):

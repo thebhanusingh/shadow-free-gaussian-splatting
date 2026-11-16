@@ -47,6 +47,40 @@ def predict(occ, rec, s, cell, dilate, eps):
     return depth[ir[:, 0], ir[:, 1]] > rec @ s + eps
 
 
+def ground_footprint(points, up, sun, plane_off, cell, margin):
+    """Where on the ground plane the shadow of `points` (M,3) can fall, for a sun at unit direction `sun`.
+
+    The plane is {x : x.up + plane_off = 0}. Every point is slid along the light to the plane, the landing spots are
+    drawn on a grid of `cell` units and grown by `margin` units (soft edges, blobs are not a closed surface).
+    Returns dict(grid, lo, cell, up, e1, e2); look cells up with in_footprint."""
+    up = up / np.linalg.norm(up)
+    sun = sun / np.linalg.norm(sun)
+    _, e1, e2 = plane_frame(up)
+    h = points @ up + plane_off
+    land = points - (h / (sun @ up))[:, None] * sun
+    uv = np.c_[land @ e1, land @ e2]
+    pad = margin + 2 * cell
+    lo = uv.min(0) - pad
+    ij = np.floor((uv - lo) / cell).astype(int)
+    shape = np.floor((uv.max(0) + pad - lo) / cell).astype(int) + 2
+    grid = np.zeros(shape, bool)
+    grid[ij[:, 0], ij[:, 1]] = True
+    r = max(1, int(round(margin / cell)))
+    grid = maximum_filter(grid, size=2 * r + 1, mode="constant", cval=False)
+    return dict(grid=grid, lo=lo, cell=cell, up=up, e1=e1, e2=e2)
+
+
+def in_footprint(fp, X):
+    """Boolean per point of X (...,3) on the ground plane: inside the footprint grid (False outside the grid)."""
+    X = np.asarray(X, float)
+    uv = np.stack([X @ fp["e1"], X @ fp["e2"]], -1)
+    ij = np.floor((uv - fp["lo"]) / fp["cell"]).astype(int)
+    ok = (ij[..., 0] >= 0) & (ij[..., 1] >= 0) & (ij[..., 0] < fp["grid"].shape[0]) & (ij[..., 1] < fp["grid"].shape[1])
+    out = np.zeros(ok.shape, bool)
+    out[ok] = fp["grid"][ij[..., 0][ok], ij[..., 1][ok]]
+    return out
+
+
 def iou(pred, obs):
     """Intersection over union of two boolean arrays (0 when both are empty)."""
     u = (pred | obs).sum()

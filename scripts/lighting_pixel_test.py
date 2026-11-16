@@ -25,7 +25,7 @@ import cv2
 import numpy as np
 import torch
 from gsplat import rasterization_2dgs
-from lighting_model_test import basis, fit_channel, predict, score
+from lighting_model_test import basis, fit_channel, predict_brightness, score
 from photo_correct import load_splat, render_labels, to_photo_space
 from PIL import Image
 from scipy.cluster.vq import kmeans2
@@ -175,7 +175,7 @@ def main():
             for c in range(3):
                 Lf = np.log(np.maximum(rgb.reshape(-1, 3)[fi][:, c], 1e-6))
                 lr, A = fit_channel(Lf, gf, Bfit, sunf, a.groups, a.lam, const_sky=const_sky)
-                out[:, c] = predict(lr, A, gt, Btest, z0)
+                out[:, c] = predict_brightness(lr, A, gt, Btest, z0)
                 sky_up["RGB"[c]] = round(float(basis(up[None], up)[0] @ A), 3)
             return out, sky_up
 
